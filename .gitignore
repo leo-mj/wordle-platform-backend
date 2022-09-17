@@ -4,4 +4,3 @@ dist
 .env.heroku
 .vscode/last.sql
 .vscode/settings.json
-solutionList.ts
