@@ -57,9 +57,8 @@ app.post("/register", async (req, res) => {
   }
 })
 
-app.get("/login/:user", async (req, res) => {
-  const {user} = req.params;
-  const {password} = req.body;
+app.get("/login/:user/:password", async (req, res) => {
+  const {user, password} = req.params;
   const invalidInput = (typeof user !== "string" || typeof password !== "string" || user.length < 1 || password.length < 1)
   if (invalidInput) {
     res.status(400).json({status: "fail", message: "You need to enter a valid username and password"});
