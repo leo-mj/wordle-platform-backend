@@ -3,6 +3,8 @@ import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
 import {dailySolution, ISolution} from "./utils/dailySolution";
+import { invalidResult, postResult } from "./utils/postResult";
+import { userDoesntExist, wrongUserOrPassword } from "./utils/registerAndLogin";
 
 config(); //Read .env file lines as though they were env vars.
 
@@ -24,8 +26,12 @@ const app = express();
 app.use(express.json()); //add body parser to each following route handler
 app.use(cors()) //add CORS support to each following route handler
 
-const client = new Client(dbConfig);
+export const client = new Client(dbConfig);
 client.connect();
+
+app.get("/", (req, res) => {
+  res.json({message: "Welcome to wordle clone muliplayer backend server"})
+})
 
 app.get<{guessDate: string}>("/solution/:guessDate", async (req, res) => {
   const guessDate = req.params.guessDate;
@@ -33,6 +39,39 @@ app.get<{guessDate: string}>("/solution/:guessDate", async (req, res) => {
   res.json(todaysSolution);
 });
 
+// registration and login
+app.post("/register", async (req, res) => {
+  const {user, password} = req.body;
+  const invalidInput = (typeof user !== "string" || typeof password !== "string" || user.length < 1 || password.length < 1)
+  if (invalidInput) {
+    res.status(400).json({status: "fail", message: "You need to enter a valid username and password"});
+  } else if (await userDoesntExist(user)) {
+      res.status(404).json({status: "fail", message: "Username already exists"});
+  } else {
+    const newUser = await client.query("insert into users (username, password) values ($1, $2) returning *", [user, password]);
+    (newUser.rowCount === 1)? (
+      res.status(200).json({status: "success", message: "You have successfully registered"}))
+    : (
+      res.status(400).json({status: "fail", message: "Oops, something has gone wrong!"})
+    )
+  }
+})
+
+app.get("/login/:user", async (req, res) => {
+  const {user} = req.params;
+  const {password} = req.body;
+  const invalidInput = (typeof user !== "string" || typeof password !== "string" || user.length < 1 || password.length < 1)
+  if (invalidInput) {
+    res.status(400).json({status: "fail", message: "You need to enter a valid username and password"});
+  } else if (await wrongUserOrPassword(user, password)) {
+    res.status(404).json({status: "fail", message: "Wrong password or username"})
+  } else {
+    res.status(200).json({status: "success", message: "Successful login"})
+  }
+})
+
+
+// getting and posting one user's results
 app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (req, res) => {
   const {user, guessDate} = req.params;
   const guessesToday = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
@@ -44,23 +83,19 @@ app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (r
 })
 
 app.post("/results/:user/:guessDate", async (req, res) => {
-  const {user, guessDate} = req.params;
+    const {user, guessDate} = req.params;
     const {password, result} = req.body;
-    const userPassword = await client.query("select password from users where username = $1", [user]);
-    const guessesToday = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
-    if (guessesToday.rowCount === 1) {
-        res.status(400).json({status: "fail", message: "You have already played today"});
-    } else if (result.length < 1) {
-        res.status(400).json({status: "fail", message: "You need to enter a result"});
-    } else if (password !== userPassword.rows[0].password) {
-        res.status(400).json({status: "fail", message: "Wrong password"})
+    if (await wrongUserOrPassword(user, password)) {
+      res.status(404).json({status: "fail", message: "Wrong password or username"})
+    } else if (await invalidResult(guessDate, user, result)) {
+      res.status(400).json({status: "fail", message: "You have already played today"});
     } else {
-        const queryText = "insert into results (result_date, username, guess) values ($1, $2, $3) returning *";
-        const values = [guessDate, user, result];
-        const response = await client.query(queryText, values);
-        response.rowCount === 1? res.json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
+      const response = await postResult(guessDate, user, result);
+      response.rowCount === 1? res.json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
     }
 })
+
+
 
 //Start the server on the given port
 const port = process.env.PORT;
