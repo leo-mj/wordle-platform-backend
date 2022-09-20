@@ -83,13 +83,13 @@ app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (r
 
 app.post("/results/:user/:guessDate", async (req, res) => {
     const {user, guessDate} = req.params;
-    const {password, result} = req.body;
+    const {password, guesses, solvedStatus, emojis} = req.body;
     if (await wrongUserOrPassword(user, password)) {
       res.status(404).json({status: "fail", message: "Wrong password or username"})
-    } else if (await invalidResult(guessDate, user, result)) {
+    } else if (await invalidResult(guessDate, user, guesses, solvedStatus, emojis)) {
       res.status(400).json({status: "fail", message: "You have already played today"});
     } else {
-      const response = await postResult(guessDate, user, result);
+      const response = await postResult(guessDate, user, guesses, solvedStatus, emojis);
       response.rowCount === 1? res.json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
     }
 })
