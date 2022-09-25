@@ -77,7 +77,7 @@ app.get<{user: string, password: string}>("/login/:user/:password", async (req, 
 })
 
 
-// getting and posting one user's results
+// getting one user's results
 app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (req, res) => {
   const {user, guessDate} = req.params;
   try {
@@ -92,6 +92,7 @@ app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (r
   }
 })
 
+// posting one user's results
 app.post<{user: string, guessDate: string}, {}, {password: string, guesses: number, solvedStatus: string, emojis: string}>("/results/:user/:guessDate", async (req, res) => {
     const {user, guessDate} = req.params;
     const {password, guesses, solvedStatus, emojis} = req.body;
@@ -106,12 +107,11 @@ app.post<{user: string, guessDate: string}, {}, {password: string, guesses: numb
       } catch (error) {
         res.status(400).json({status: "fail", message: error});
       }
-      
     }
 })
 
-// creating and joining a group
-app.post<{user: string}, {}, {group: string, userPassword: string, groupPasscode: string}>("/groups/create/:user", async (req, res) => {
+// creating a group
+app.post<{user: string}, {}, {userPassword: string, group: string, groupPasscode: string}>("/groups/create/:user", async (req, res) => {
   const {user} = req.params;
   const {userPassword, group, groupPasscode} = req.body;
   const invalidInput = (typeof group !== "string" || typeof groupPasscode !== "string" || group.length < 1 || groupPasscode.length < 1)
@@ -135,6 +135,7 @@ app.post<{user: string}, {}, {group: string, userPassword: string, groupPasscode
   }
 })
 
+// joining a group
 app.post<{group: string}, {}, {user: string, userPassword: string, groupPasscode: string}>("/groups/join/:group", async (req, res) => {
   const {group} = req.params;
   const {user, userPassword, groupPasscode} = req.body;
@@ -166,7 +167,6 @@ app.get<{user: string, date: string}>("/groups/results/:user/:date", async (req,
   const {user, date} = req.params;
   try {
     const dbResponse: Group[] = await getGroupResults(user, date);
-    console.log(dbResponse);
     res.status(200).json(dbResponse);
   } catch (error) {
     console.error(error);

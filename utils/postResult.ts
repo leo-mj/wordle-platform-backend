@@ -5,7 +5,7 @@ export async function invalidResult(guessDate: string, user: string, guesses: nu
     const hasGuessed = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
     if (hasGuessed.rowCount > 0) {
       return true;
-    } else if (guesses < 1 || solvedStatus !== ("solved"|| "failed") || emojis.length < 5) {
+    } else if (guesses < 1 || (solvedStatus !== "solved" && solvedStatus !== "failed") || emojis.length < 5) {
       return true;
     }
     return false;

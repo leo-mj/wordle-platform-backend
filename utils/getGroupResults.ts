@@ -4,7 +4,7 @@ import {client} from "../server";
 export interface GroupEntry {
     username: string;
     guesses: number;
-    solved: string;
+    solved_status: string;
     emojis: string
 }
 
