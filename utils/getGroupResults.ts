@@ -21,6 +21,7 @@ export async function getGroupResults(user: string, date: string): Promise<Group
         return allGroupResults;
     } catch (error) {
         console.error(error);
+        return;
     }
 }
 
@@ -35,6 +36,7 @@ async function getResults(groupName: string, date: string): Promise<Group> {
         return groupObj;
     } catch (error) {
         console.error(error)
+        return;
     }
 }
 

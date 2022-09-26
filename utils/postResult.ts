@@ -12,6 +12,7 @@ export async function invalidResult(guessDate: string, user: string, guesses: nu
     // add more checks
   } catch (error) {
     console.error(error);
+    return true;
   }
 } 
 
@@ -23,5 +24,6 @@ export async function postResult(guessDate: string, user: string, guesses: numbe
     return response;
   } catch (error) {
     console.error(error)
+    return 
   }
 }

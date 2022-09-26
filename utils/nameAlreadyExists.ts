@@ -21,5 +21,6 @@ export async function groupAlreadyExists(group: string): Promise<boolean> {
         return false;  
     } catch (error) {
         console.error(error);
+        return true;
     }
 }
