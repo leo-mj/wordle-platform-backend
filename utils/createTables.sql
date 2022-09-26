@@ -12,7 +12,8 @@ create table results (result_id serial primary key not null, result_date varchar
                         solved_status varchar(10) not null, emojis varchar(100) not null,
                         foreign key (username) references users(username) on delete cascade);
 
-                           
+
+alter table group_members add constraint UC_group_members unique (groupname, username);                           
 
 
 

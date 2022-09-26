@@ -38,8 +38,13 @@ app.get("/", (req, res) => {
 
 app.get<{guessDate: string}>("/solution/:guessDate", async (req, res) => {
   const guessDate = req.params.guessDate;
-  const todaysSolution: ISolution = dailySolution(guessDate);
-  res.json(todaysSolution);
+  try {
+    const todaysSolution: ISolution = dailySolution(guessDate);
+    res.status(200).json(todaysSolution);
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({status: "fail", message: error})
+  }
 });
 
 // registration and login
@@ -58,8 +63,9 @@ app.post<{}, {}, {user: string, password: string}>("/register", async (req, res)
       : (
         res.status(400).json({status: "fail", message: "Oops, something has gone wrong!"})
       )
-    } catch(err) {
-      res.status(400).json({status: "fail", message: err});
+    } catch(error) {
+      console.error(error);
+      res.status(400).json({status: "fail", message: error});
     }
   }
 })
@@ -76,6 +82,24 @@ app.get<{user: string, password: string}>("/login/:user/:password", async (req, 
   }
 })
 
+// deleting an account
+app.delete<{user: string, password: string}>("/delete/:user/:password", async (req, res) => {
+  const {user, password} = req.params;
+  const invalidInput = (typeof user !== "string" || typeof password !== "string" || user.length < 1 || password.length < 1)
+  if (invalidInput) {
+    res.status(400).json({status: "fail", message: "You need to enter a valid username and password"});
+  } else if (await wrongUserOrPassword(user, password)) {
+    res.status(404).json({status: "fail", message: "Wrong password or username"})
+  } else {
+    try {
+      await client.query(`delete from users where username = $1`, [user]);
+      res.status(200).json({status: "success", message: `Deleted ${user}`});
+    } catch (error) {
+      console.error(error);
+      res.status(404).json({status: "fail", message: error});
+    }
+  }
+})
 
 // getting one user's results
 app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (req, res) => {
@@ -88,6 +112,7 @@ app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (r
       res.status(404).json({status: "fail", message: "Could not find result"});
     }
   } catch (error) {
+    console.error(error);
     res.status(404).json({status: "fail", message: error});
   }
 })
@@ -105,6 +130,7 @@ app.post<{user: string, guessDate: string}, {}, {password: string, guesses: numb
         const dbResponse = await postResult(guessDate, user, guesses, solvedStatus, emojis);
         dbResponse.rowCount === 1? res.json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
       } catch (error) {
+        console.error(error);
         res.status(400).json({status: "fail", message: error});
       }
     }
@@ -130,6 +156,7 @@ app.post<{user: string}, {}, {userPassword: string, group: string, groupPasscode
         res.status(400).json({status: "fail", message: "Oops, something has gone wrong!"})
       )
     } catch (error) {
+      console.error(error);
       res.status(400).json({status: "fail", message: error})
     }
   }
@@ -163,6 +190,7 @@ app.post<{group: string}, {}, {user: string, userPassword: string, groupPasscode
   }
 })
 
+// leaving a group
 app.delete<{group: string, user: string, userPassword: string}>("/groups/exit/:group/:user/:userPassword", async (req, res) => {
   const {group, user, userPassword} = req.params;
   const invalidInput = (typeof group !== "string" || group.length < 1)
@@ -189,6 +217,7 @@ app.get<{user: string, date: string}>("/groups/results/:user/:date", async (req,
     res.status(200).json(dbResponse);
   } catch (error) {
     console.error(error);
+    res.status(400).json({status: "fail", message: error});
   }
 })
 
