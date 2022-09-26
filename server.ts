@@ -157,7 +157,26 @@ app.post<{group: string}, {}, {user: string, userPassword: string, groupPasscode
         res.status(400).json({status: "fail", message: "Oops, something has gone wrong!"})
       }
     } catch (error) {
+      console.error(error);
       res.status(400).json({status: "fail", message: error})
+    }
+  }
+})
+
+app.delete<{group: string, user: string, userPassword: string}>("/groups/exit/:group/:user/:userPassword", async (req, res) => {
+  const {group, user, userPassword} = req.params;
+  const invalidInput = (typeof group !== "string" || group.length < 1)
+  if (invalidInput) {
+    res.status(400).json({status: "fail", message: "You need to enter a valid group name and passcode"});
+  } else if (await wrongUserOrPassword(user, userPassword)) {
+    res.status(404).json({status: "fail", message: "You need to log into a valid account"});
+  } else {
+    try {
+      const dbResponse = await client.query(`delete from group_members where groupname = $1 and username = $2 returning *`, [group, user]);
+      res.status(200).json({status: "success", message: dbResponse})
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({status: "fail", message: error});
     }
   }
 })
