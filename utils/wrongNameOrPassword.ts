@@ -3,7 +3,6 @@ import { client } from "../server";
 export async function wrongUserOrPassword(user: string, password: string) {
   try {
     const checkUser = await client.query("select * from users where username = $1", [user]);
-    console.log(checkUser)
     const givenUsersPassword = checkUser.rows[0].password
     if (checkUser.rowCount !== 1 || password !== givenUsersPassword) {
       return true;
