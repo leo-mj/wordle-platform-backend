@@ -101,13 +101,13 @@ app.delete<{user: string, password: string}>("/delete/:user/:password", async (r
   }
 })
 
-// getting one user's results
+// getting one user's current result
 app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (req, res) => {
   const {user, guessDate} = req.params;
   try {
     const guessesToday = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
     if (guessesToday.rowCount === 1) {
-      res.json(guessesToday.rows);
+      res.status(200).json(guessesToday.rows);
     } else {
       res.status(404).json({status: "fail", message: "Could not find result"});
     }
@@ -117,7 +117,7 @@ app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (r
   }
 })
 
-// posting one user's results
+// posting one user's current result
 app.post<{user: string, guessDate: string}, {}, {password: string, guesses: number, solvedStatus: string, emojis: string}>("/results/:user/:guessDate", async (req, res) => {
     const {user, guessDate} = req.params;
     const {password, guesses, solvedStatus, emojis} = req.body;
@@ -128,12 +128,32 @@ app.post<{user: string, guessDate: string}, {}, {password: string, guesses: numb
     } else {
       try {
         const dbResponse = await postResult(guessDate, user, guesses, solvedStatus, emojis);
-        dbResponse.rowCount === 1? res.json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
+        dbResponse.rowCount === 1? res.status(200).json({status: "success", message: "Your result has been recorded"}) : res.json({status: "fail"});
       } catch (error) {
         console.error(error);
         res.status(400).json({status: "fail", message: error});
       }
     }
+})
+
+// getting one user's result stats
+app.get<{user: string, password: string}>("/users/stats/:user/:password", async(req, res) => {
+  const {user, password} = req.params;
+  if (await wrongUserOrPassword(user, password)) {
+    res.status(404).json({status: "fail", message: "Wrong password or username"})
+  } else {
+    try {
+      const statsQuery = `select round(avg(guesses), 2) as avg_guesses, count(*) as total_games, 
+      (select count(*) from results solved where solved.username = $1 and solved.solved_status = 'solved') as games_solved,
+      (((select count(*) from results solved where solved.username = $1 and solved.solved_status = 'solved')/count(*)) * 100) 
+      as solved_percentage from results where username = $1`;
+      const stats = await client.query(statsQuery, [user]);
+      res.status(200).json(stats.rows);
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({status: "fail", message: error});
+    }
+  }
 })
 
 // creating a group
@@ -221,7 +241,30 @@ app.get<{user: string, date: string}>("/groups/results/:user/:date", async (req,
   }
 })
 
+// getting all stats from members of one groups
+app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:user/:password", async (req, res) => {
+  const {group, user, password} = req.params;
+  if (await wrongUserOrPassword(user, password)) {
+    res.status(404).json({status: "fail", message: "You need to log into a valid account"});
+    return;
+  }
+  try {
+    const statsQuery = `select results.username, round(avg(guesses), 2) as avg_guesses, count(*) as total_games, 
+    (select count(*) from results solved where solved.solved_status = 'solved') as games_solved,
+    (((select count(*) from results solved where solved.solved_status = 'solved')/count(*)) * 100) as solved_percentage from results
+    join group_members
+    on results.username = group_members.username
+    where group_members.groupname = $1
+    group by results.username order by avg_guesses`;
+    const groupStats = await client.query(statsQuery, [group]);
+    res.status(200).json(groupStats.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({status: "fail", message: error});
+  }
+})
 
+  
 //Start the server on the given port
 const port = process.env.PORT;
 if (!port) {
