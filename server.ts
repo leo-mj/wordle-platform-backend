@@ -143,12 +143,24 @@ app.get<{user: string, password: string}>("/users/stats/:user/:password", async(
     res.status(404).json({status: "fail", message: "Wrong password or username"})
   } else {
     try {
-      const statsQuery = `select round(avg(guesses), 2) as avg_guesses, count(*) as total_games, 
-      (select count(*) from results solved where solved.username = $1 and solved.solved_status = 'solved') as games_solved,
-      (((select count(*) from results solved where solved.username = $1 and solved.solved_status = 'solved')/count(*)) * 100) 
-      as solved_percentage from results where username = $1`;
+      const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
+        count(allgames.*) as total_games, 
+        count(solved.*) as games_solved,
+        round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
+        coalesce((count(solved.*)*6 - sum(solved.guesses)), 0) as points
+        from results allgames
+        left join (select * from results solved where solved.solved_status = 'solved') as solved
+        on allgames.result_id = solved.result_id
+        join users
+        on allgames.username = users.username
+        where users.username = $1 
+        group by allgames.username`;
       const stats = await client.query(statsQuery, [user]);
-      res.status(200).json(stats.rows);
+
+      const historyQuery = `select * from results where username = $1 order by result_id desc limit 5`;
+      const history = await client.query(historyQuery, [user]);
+
+      res.status(200).json({stats: stats.rows, history: history.rows});
     } catch (error) {
       console.error(error);
       res.status(400).json({status: "fail", message: error});
@@ -250,16 +262,16 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
   }
   try {
     const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
-    count(allgames.*) as total_games, count(solved.*) as games_solved,
-    round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
-    coalesce((count(solved.*)*6 - sum(solved.guesses)),0) as points
-        from results allgames
-        left join (select * from results solved where solved.solved_status = 'solved') as solved
-        on allgames.result_id = solved.result_id
-        join group_members
-        on allgames.username = group_members.username
-        where group_members.groupname = $1 
-        group by allgames.username order by points desc`;
+      count(allgames.*) as total_games, count(solved.*) as games_solved,
+      round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
+      coalesce((count(solved.*)*6 - sum(solved.guesses)),0) as points
+      from results allgames
+      left join (select * from results solved where solved.solved_status = 'solved') as solved
+      on allgames.result_id = solved.result_id
+      join group_members
+      on allgames.username = group_members.username
+      where group_members.groupname = $1 
+      group by allgames.username order by points desc`;
     const groupStats = await client.query(statsQuery, [group]);
     res.status(200).json(groupStats.rows);
   } catch (error) {
