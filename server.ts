@@ -249,13 +249,17 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
     return;
   }
   try {
-    const statsQuery = `select results.username, round(avg(guesses), 2) as avg_guesses, count(*) as total_games, 
-    (select count(*) from results solved where solved.solved_status = 'solved') as games_solved,
-    (((select count(*) from results solved where solved.solved_status = 'solved')/count(*)) * 100) as solved_percentage from results
-    join group_members
-    on results.username = group_members.username
-    where group_members.groupname = $1
-    group by results.username order by avg_guesses`;
+    const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
+    count(allgames.*) as total_games, count(solved.*) as games_solved,
+    round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
+    coalesce((count(solved.*)*6 - sum(solved.guesses)),0) as points
+        from results allgames
+        left join (select * from results solved where solved.solved_status = 'solved') as solved
+        on allgames.result_id = solved.result_id
+        join group_members
+        on allgames.username = group_members.username
+        where group_members.groupname = $1 
+        group by allgames.username order by points desc`;
     const groupStats = await client.query(statsQuery, [group]);
     res.status(200).json(groupStats.rows);
   } catch (error) {
