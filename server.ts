@@ -8,6 +8,7 @@ import {wrongUserOrPassword } from "./utils/wrongNameOrPassword";
 import { userAlreadyExists, groupAlreadyExists } from "./utils/nameAlreadyExists";
 import { createGroup, joinGroup } from "./utils/createAndJoinGroup";
 import { getGroupResults, Group } from "./utils/getGroupResults"
+import { getMonth } from "./utils/getMonth";
 
 config(); //Read .env file lines as though they were env vars.
 
@@ -261,6 +262,7 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
     return;
   }
   try {
+    const month = getMonth();
     const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
       count(allgames.*) as total_games, count(solved.*) as games_solved,
       round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
@@ -270,9 +272,9 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
       on allgames.result_id = solved.result_id
       join group_members
       on allgames.username = group_members.username
-      where group_members.groupname = $1 
+      where group_members.groupname = $1 and allgames.result_date like $2
       group by allgames.username order by points desc`;
-    const groupStats = await client.query(statsQuery, [group]);
+    const groupStats = await client.query(statsQuery, [group, `%-${month}`]);
     res.status(200).json(groupStats.rows);
   } catch (error) {
     console.error(error);
