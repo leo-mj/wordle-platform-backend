@@ -2,13 +2,13 @@ import { Client } from "pg";
 import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
-import {dailySolution, ISolution} from "./utils/dailySolution";
 import { invalidResult, postResult } from "./utils/postResult";
 import {wrongUserOrPassword } from "./utils/wrongNameOrPassword";
 import { userAlreadyExists, groupAlreadyExists } from "./utils/nameAlreadyExists";
 import { createGroup, joinGroup } from "./utils/createAndJoinGroup";
 import { getGroupResults, Group } from "./utils/getGroupResults"
 import { getMonth } from "./utils/getMonth";
+import { getSolution } from "./utils/getSolution";
 
 config(); //Read .env file lines as though they were env vars.
 
@@ -40,7 +40,7 @@ app.get("/", (req, res) => {
 app.get<{guessDate: string}>("/solution/:guessDate", async (req, res) => {
   const guessDate = req.params.guessDate;
   try {
-    const todaysSolution: ISolution = dailySolution(guessDate);
+    const todaysSolution: string = await getSolution(guessDate);
     res.status(200).json(todaysSolution);
   } catch (error) {
     console.error(error);
