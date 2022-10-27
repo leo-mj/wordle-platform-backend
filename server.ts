@@ -144,6 +144,7 @@ app.get<{user: string, password: string}>("/users/stats/:user/:password", async(
     res.status(404).json({status: "fail", message: "Wrong password or username"})
   } else {
     try {
+      const month = getMonth();
       const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
         count(allgames.*) as total_games, 
         count(solved.*) as games_solved,
@@ -151,15 +152,15 @@ app.get<{user: string, password: string}>("/users/stats/:user/:password", async(
         coalesce((count(solved.*)*6 - sum(solved.guesses)), 0) as points
         from results allgames
         left join (select * from results solved where solved.solved_status = 'solved') as solved
-        on allgames.result_id = solved.result_id
+        on allgames.username = solved.username and allgames.result_date = solved.result_date
         join users
         on allgames.username = users.username
         where users.username = $1 
         group by allgames.username`;
       const stats = await client.query(statsQuery, [user]);
 
-      const historyQuery = `select * from results where username = $1 order by result_id desc limit 5`;
-      const history = await client.query(historyQuery, [user]);
+      const historyQuery = `select * from results where username = $1 and result_date like $2 order by result_date desc limit 5`;
+      const history = await client.query(historyQuery, [user, `%-${month}`]);
 
       res.status(200).json({stats: stats.rows, history: history.rows});
     } catch (error) {
@@ -269,7 +270,7 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
       coalesce((count(solved.*)*6 - sum(solved.guesses)),0) as points
       from results allgames
       left join (select * from results solved where solved.solved_status = 'solved') as solved
-      on allgames.result_id = solved.result_id
+      on allgames.username = solved.username and allgames.result_date = solved.result_date
       join group_members
       on allgames.username = group_members.username
       where group_members.groupname = $1 and allgames.result_date like $2
