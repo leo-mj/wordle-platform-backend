@@ -149,7 +149,7 @@ app.get<{user: string, password: string}>("/users/stats/:user/:password", async(
         count(allgames.*) as total_games, 
         count(solved.*) as games_solved,
         round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
-        coalesce((count(solved.*)*6 - sum(solved.guesses)), 0) as points
+        coalesce((count(solved.*)*7 - sum(solved.guesses)), 0) as points
         from results allgames
         left join (select * from results solved where solved.solved_status = 'solved') as solved
         on allgames.username = solved.username and allgames.result_date = solved.result_date
@@ -267,7 +267,7 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
     const statsQuery = `select allgames.username, round(avg(allgames.guesses), 2) as avg_guesses, 
       count(allgames.*) as total_games, count(solved.*) as games_solved,
       round((cast(count(solved.*) as decimal)/cast(count(allgames.*) as decimal))*100, 0) as solved_percentage, 
-      coalesce((count(solved.*)*6 - sum(solved.guesses)),0) as points
+      coalesce((count(solved.*)*7 - sum(solved.guesses)),0) as points
       from results allgames
       left join (select * from results solved where solved.solved_status = 'solved') as solved
       on allgames.username = solved.username and allgames.result_date = solved.result_date
