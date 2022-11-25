@@ -10,7 +10,7 @@ create table group_members (id serial primary key not null, groupname varchar(30
 create table results (result_date varchar(30) not null, username varchar(30) not null, 
                         guesses int not null,
                         solved_status varchar(10) not null, emojis varchar(100) not null,
-                        primary key (result_date, username)
+                        primary key (result_date, username),
                         foreign key (username) references users(username) on delete cascade);
 
 
