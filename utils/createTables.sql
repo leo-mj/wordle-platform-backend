@@ -72,8 +72,6 @@ insert into word_list (word) values
 ('DADDY'),
 ('QUASI'),
 ('ARISE'),
-('DONT'),
-('REPOST'),
 ('AGING'),
 ('VALET'),
 ('OPIUM'),
