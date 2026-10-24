@@ -1,4 +1,4 @@
-import { Client } from "pg";
+import { Pool } from "pg";
 import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
@@ -22,7 +22,7 @@ if (!process.env.LOCAL && /[?&]sslmode=/.test(process.env.DATABASE_URL ?? "")) {
   throw 'Remove sslmode from DATABASE_URL; TLS verification is configured in server.ts.';
 }
 const sslSetting = { rejectUnauthorized: true, ca: supabaseRootCA }
-const dbConfig = process.env.LOCAL ? "wordle" : {
+const dbConfig = process.env.LOCAL ? { database: "wordle" } : {
   connectionString: process.env.DATABASE_URL,
   ssl: sslSetting,
 };
@@ -32,8 +32,14 @@ const app = express();
 app.use(express.json()); //add body parser to each following route handler
 app.use(cors()) //add CORS support to each following route handler
 
-export const client = new Client(dbConfig);
-client.connect().catch((error) => {
+//A pool replaces connections that the DB or network drops, instead of reusing one connection for the process lifetime.
+//Supabase's free plan allows 60 direct connections / 200 pooler clients, so 5 leaves plenty of headroom.
+export const pool = new Pool({ ...dbConfig, max: 5 });
+pool.on("error", (error) => {
+  //an idle connection was closed by the DB or network; the pool discards it and opens a new one when needed
+  console.error("Idle database connection error:", error);
+});
+pool.query("select 1").catch((error) => {
   console.error("Could not connect to the database:", error);
   process.exit(1);
 });
@@ -45,7 +51,7 @@ app.get("/", (req, res) => {
 // called by the frontend on page load, so the server and its DB connection are awake before the user logs in
 app.get("/health", async (req, res) => {
   try {
-    await client.query("select 1");
+    await pool.query("select 1");
     res.status(200).json({status: "ok"});
   } catch (error) {
     console.error(error);
@@ -74,7 +80,7 @@ app.post<{}, {}, {user: string, password: string}>("/register", async (req, res)
       res.status(404).json({status: "fail", message: "Username already exists"});
   } else {
     try {
-      const newUser = await client.query("insert into users (username, password) values ($1, $2) returning *", [user, password]);
+      const newUser = await pool.query("insert into users (username, password) values ($1, $2) returning *", [user, password]);
       (newUser.rowCount === 1)? (
         res.status(200).json({status: "success", message: "You have successfully registered"}))
       : (
@@ -109,7 +115,7 @@ app.delete<{user: string, password: string}>("/delete/:user/:password", async (r
     res.status(404).json({status: "fail", message: "Wrong password or username"})
   } else {
     try {
-      await client.query(`delete from users where username = $1`, [user]);
+      await pool.query(`delete from users where username = $1`, [user]);
       res.status(200).json({status: "success", message: `Deleted ${user}`});
     } catch (error) {
       console.error(error);
@@ -122,7 +128,7 @@ app.delete<{user: string, password: string}>("/delete/:user/:password", async (r
 app.get<{user: string, guessDate: string}>("/results/:user/:guessDate", async (req, res) => {
   const {user, guessDate} = req.params;
   try {
-    const guessesToday = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
+    const guessesToday = await pool.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
     if (guessesToday.rowCount === 1) {
       res.status(200).json(guessesToday.rows);
     } else {
@@ -173,10 +179,10 @@ app.get<{user: string, password: string}>("/users/stats/:user/:password", async(
         on allgames.username = users.username
         where users.username = $1 
         group by allgames.username`;
-      const stats = await client.query(statsQuery, [user]);
+      const stats = await pool.query(statsQuery, [user]);
 
       const historyQuery = `select * from results where username = $1 and result_date like $2 order by result_date desc limit 5`;
-      const history = await client.query(historyQuery, [user, `%-${month}`]);
+      const history = await pool.query(historyQuery, [user, `%-${month}`]);
 
       res.status(200).json({stats: stats.rows, history: history.rows});
     } catch (error) {
@@ -250,7 +256,7 @@ app.delete<{group: string, user: string, userPassword: string}>("/groups/exit/:g
     res.status(404).json({status: "fail", message: "You need to log into a valid account"});
   } else {
     try {
-      const dbResponse = await client.query(`delete from group_members where groupname = $1 and username = $2 returning *`, [group, user]);
+      const dbResponse = await pool.query(`delete from group_members where groupname = $1 and username = $2 returning *`, [group, user]);
       res.status(200).json({status: "success", message: dbResponse})
     } catch (error) {
       console.error(error);
@@ -291,7 +297,7 @@ app.get<{group: string, user: string, password: string}>("/groups/:group/stats/:
       on allgames.username = group_members.username
       where group_members.groupname = $1 and allgames.result_date like $2
       group by allgames.username order by points desc`;
-    const groupStats = await client.query(statsQuery, [group, `%-${month}`]);
+    const groupStats = await pool.query(statsQuery, [group, `%-${month}`]);
     res.status(200).json(groupStats.rows);
   } catch (error) {
     console.error(error);

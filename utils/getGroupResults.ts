@@ -1,5 +1,5 @@
 import { QueryResult } from "pg";
-import {client} from "../server";
+import {pool} from "../server";
 
 export interface GroupEntry {
     username: string;
@@ -15,7 +15,7 @@ export interface Group {
 
 export async function getGroupResults(user: string, date: string): Promise<Group[]> {
     try {
-        const allGroupNamesAsObjArr = await client.query("select groupname from group_members where username = $1", [user]);
+        const allGroupNamesAsObjArr = await pool.query("select groupname from group_members where username = $1", [user]);
         const allGroupNames: string[] = allGroupNamesAsObjArr.rows.map((obj) => obj.groupname);
         const allGroupResults: Group[] = await Promise.all(allGroupNames.map(async (group) => {return await getResults(group, date)}));
         return allGroupResults;
@@ -27,7 +27,7 @@ export async function getGroupResults(user: string, date: string): Promise<Group
 
 async function getResults(groupName: string, date: string): Promise<Group> {
     try {
-        const groupEntriesAsObjArr = await client.query(`select username, guesses, solved_status, emojis from results 
+        const groupEntriesAsObjArr = await pool.query(`select username, guesses, solved_status, emojis from results 
         where result_date = $1 and username in 
         (select username from group_members where groupname = $2)`, 
         [date, groupName]);
