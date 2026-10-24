@@ -1,8 +1,8 @@
 import { pool } from "../server";
-import { wrongGroupOrPasscode } from "./wrongNameOrPassword";
+import { hashSecret, wrongGroupOrPasscode } from "./wrongNameOrPassword";
 
 export async function createGroup(user: string, group: string, passcode: string): Promise<string> {
-    const newGroup = await pool.query("insert into group_names (groupname, password) values ($1, $2) returning *", [group, passcode]);
+    const newGroup = await pool.query("insert into group_names (groupname, password) values ($1, $2) returning *", [group, await hashSecret(passcode)]);
     const userJoined = await joinGroup(user, group, passcode);
     if (newGroup.rowCount !== 1) {
         return "group could not be created"

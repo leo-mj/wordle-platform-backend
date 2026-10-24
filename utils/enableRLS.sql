@@ -11,9 +11,10 @@ alter table public.group_members enable row level security;
 alter table public.results enable row level security;
 alter table public.target_words enable row level security;
 alter table public.word_list enable row level security;
+alter table public.sessions enable row level security;
 
 revoke all on table public.users, public.group_names, public.group_members,
-                    public.results, public.target_words, public.word_list
+                    public.results, public.target_words, public.word_list, public.sessions
   from anon, authenticated;
 revoke all on sequence public.group_members_id_seq, public.word_list_id_seq
   from anon, authenticated;
