@@ -1,8 +1,8 @@
-import { client } from "../server";
+import { pool } from "../server";
 
 export async function invalidResult(guessDate: string, user: string, guesses: number, solvedStatus: string, emojis: string) {
   try {
-    const hasGuessed = await client.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
+    const hasGuessed = await pool.query("select * from results where result_date = $1 and username = $2", [guessDate, user]);
     if (hasGuessed.rowCount > 0) {
       return true;
     } else if (guesses < 1 || (solvedStatus !== "solved" && solvedStatus !== "failed") || emojis.length < 5) {
@@ -20,7 +20,7 @@ export async function postResult(guessDate: string, user: string, guesses: numbe
   try {
     const queryText = "insert into results (result_date, username, guesses, solved_status, emojis) values ($1, $2, $3, $4, $5) returning *";
     const values = [guessDate, user, guesses, solvedStatus, emojis];
-    const response = await client.query(queryText, values);
+    const response = await pool.query(queryText, values);
     return response;
   } catch (error) {
     console.error(error)
