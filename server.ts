@@ -42,6 +42,17 @@ app.get("/", (req, res) => {
   res.json({message: "Welcome to wordle clone muliplayer backend server"})
 })
 
+// called by the frontend on page load, so the server and its DB connection are awake before the user logs in
+app.get("/health", async (req, res) => {
+  try {
+    await client.query("select 1");
+    res.status(200).json({status: "ok"});
+  } catch (error) {
+    console.error(error);
+    res.status(503).json({status: "fail", message: "Database unavailable"});
+  }
+})
+
 app.get<{guessDate: string}>("/solution/:guessDate", async (req, res) => {
   const guessDate = req.params.guessDate;
   try {
