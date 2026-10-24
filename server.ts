@@ -9,17 +9,19 @@ import { createGroup, joinGroup } from "./utils/createAndJoinGroup";
 import { getGroupResults, Group } from "./utils/getGroupResults"
 import { getMonth } from "./utils/getMonth";
 import { getSolution } from "./utils/getSolution";
+import { supabaseRootCA } from "./utils/supabaseRootCA";
 
 config(); //Read .env file lines as though they were env vars.
 
 //Call this script with the environment variable LOCAL set if you want to connect to a local db (i.e. without SSL)
-//Do not set the environment variable LOCAL if you want to connect to a heroku DB.
+//Do not set the environment variable LOCAL if you want to connect to the Supabase DB.
 
-//For the ssl property of the DB connection config, use a value of...
-// false - when connecting to a local DB
-// { rejectUnauthorized: false } - when connecting to a heroku DB
-const herokuSSLSetting = { rejectUnauthorized: false }
-const sslSetting = process.env.LOCAL ? false : herokuSSLSetting
+//For the Supabase DB, verify the server certificate against Supabase's root CA (equivalent to sslmode=verify-full).
+//pg lets an sslmode in the connection string override this ssl object, so refuse to start if one is set.
+if (!process.env.LOCAL && /[?&]sslmode=/.test(process.env.DATABASE_URL ?? "")) {
+  throw 'Remove sslmode from DATABASE_URL; TLS verification is configured in server.ts.';
+}
+const sslSetting = { rejectUnauthorized: true, ca: supabaseRootCA }
 const dbConfig = process.env.LOCAL ? "wordle" : {
   connectionString: process.env.DATABASE_URL,
   ssl: sslSetting,
@@ -31,7 +33,10 @@ app.use(express.json()); //add body parser to each following route handler
 app.use(cors()) //add CORS support to each following route handler
 
 export const client = new Client(dbConfig);
-client.connect();
+client.connect().catch((error) => {
+  console.error("Could not connect to the database:", error);
+  process.exit(1);
+});
 
 app.get("/", (req, res) => {
   res.json({message: "Welcome to wordle clone muliplayer backend server"})
